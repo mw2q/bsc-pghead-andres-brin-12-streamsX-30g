@@ -1,0 +1,42 @@
+BEGIN;
+BEGIN
+EXPLAIN
+select
+	c_count,
+	count(*) as custdist
+from
+	(
+		select
+			c_custkey,
+			count(o_orderkey)
+		from
+			customer left outer join orders on
+				c_custkey = o_custkey
+				and o_comment not like '%pending%accounts%'
+		group by
+			c_custkey
+	) as c_orders (c_custkey, c_count)
+group by
+	c_count
+order by
+	custdist desc,
+	c_count desc;
+                                           QUERY PLAN                                            
+-------------------------------------------------------------------------------------------------
+ Sort  (cost=2646672.22..2646672.72 rows=200 width=8)
+   Sort Key: (count(*)), (count(orders.o_orderkey))
+   ->  HashAggregate  (cost=2646662.58..2646664.58 rows=200 width=8)
+         Group Key: count(orders.o_orderkey)
+         ->  HashAggregate  (cost=2534162.58..2579162.58 rows=4500000 width=8)
+               Group Key: customer.c_custkey
+               ->  Hash Right Join  (cost=207086.00..2311181.93 rows=44596129 width=8)
+                     Hash Cond: (orders.o_custkey = customer.c_custkey)
+                     ->  Seq Scan on orders  (cost=0.00..1323663.68 rows=44596129 width=8)
+                           Filter: ((o_comment)::text !~~ '%pending%accounts%'::text)
+                     ->  Hash  (cost=150836.00..150836.00 rows=4500000 width=4)
+                           ->  Seq Scan on customer  (cost=0.00..150836.00 rows=4500000 width=4)
+ Planning time: 2.058 ms
+(13 rows)
+
+COMMIT;
+COMMIT

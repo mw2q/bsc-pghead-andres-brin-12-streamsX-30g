@@ -1,0 +1,42 @@
+BEGIN;
+BEGIN
+EXPLAIN
+select
+	c_count,
+	count(*) as custdist
+from
+	(
+		select
+			c_custkey,
+			count(o_orderkey)
+		from
+			customer left outer join orders on
+				c_custkey = o_custkey
+				and o_comment not like '%special%requests%'
+		group by
+			c_custkey
+	) as c_orders (c_custkey, c_count)
+group by
+	c_count
+order by
+	custdist desc,
+	c_count desc;
+                                           QUERY PLAN                                            
+-------------------------------------------------------------------------------------------------
+ Sort  (cost=2642610.81..2642611.31 rows=200 width=8)
+   Sort Key: (count(*)), (count(orders.o_orderkey))
+   ->  HashAggregate  (cost=2642601.17..2642603.17 rows=200 width=8)
+         Group Key: count(orders.o_orderkey)
+         ->  HashAggregate  (cost=2530101.17..2575101.17 rows=4500000 width=8)
+               Group Key: customer.c_custkey
+               ->  Hash Right Join  (cost=207086.00..2308023.06 rows=44415622 width=8)
+                     Hash Cond: (orders.o_custkey = customer.c_custkey)
+                     ->  Seq Scan on orders  (cost=0.00..1323663.68 rows=44415622 width=8)
+                           Filter: ((o_comment)::text !~~ '%special%requests%'::text)
+                     ->  Hash  (cost=150836.00..150836.00 rows=4500000 width=4)
+                           ->  Seq Scan on customer  (cost=0.00..150836.00 rows=4500000 width=4)
+ Planning time: 2.217 ms
+(13 rows)
+
+COMMIT;
+COMMIT

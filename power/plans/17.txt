@@ -1,0 +1,39 @@
+BEGIN;
+BEGIN
+EXPLAIN
+select
+	sum(l_extendedprice) / 7.0 as avg_yearly
+from
+	lineitem,
+	part
+where
+	p_partkey = l_partkey
+	and p_brand = 'Brand#42'
+	and p_container = 'LG DRUM'
+	and l_quantity < (
+		select
+			0.2 * avg(l_quantity)
+		from
+			lineitem
+		where
+			l_partkey = p_partkey
+	);
+                                                                 QUERY PLAN                                                                  
+---------------------------------------------------------------------------------------------------------------------------------------------
+ Aggregate  (cost=342657.40..342657.41 rows=1 width=4)
+   ->  Nested Loop  (cost=215.96..342507.15 rows=60100 width=4)
+         ->  Bitmap Heap Scan on part  (cost=210.16..19898.62 rows=6010 width=4)
+               Recheck Cond: ((p_container = 'LG DRUM'::bpchar) AND (p_brand = 'Brand#42'::bpchar))
+               ->  Bitmap Index Scan on part_p_container_p_brand_p_partkey_idx  (cost=0.00..208.66 rows=6010 width=0)
+                     Index Cond: ((p_container = 'LG DRUM'::bpchar) AND (p_brand = 'Brand#42'::bpchar))
+         ->  Index Scan using lineitem_l_partkey_l_quantity_idx on lineitem  (cost=5.80..53.57 rows=11 width=12)
+               Index Cond: ((l_partkey = part.p_partkey) AND (l_quantity < (SubPlan 1)))
+               SubPlan 1
+                 ->  Aggregate  (cost=5.21..5.23 rows=1 width=4)
+                       ->  Index Only Scan using lineitem_l_partkey_l_quantity_idx on lineitem lineitem_1  (cost=0.57..5.13 rows=32 width=4)
+                             Index Cond: (l_partkey = part.p_partkey)
+ Planning time: 2.148 ms
+(13 rows)
+
+COMMIT;
+COMMIT

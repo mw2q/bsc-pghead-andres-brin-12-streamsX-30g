@@ -1,0 +1,58 @@
+BEGIN;
+BEGIN
+EXPLAIN
+select
+	p_brand,
+	p_type,
+	p_size,
+	count(distinct ps_suppkey) as supplier_cnt
+from
+	partsupp,
+	part
+where
+	p_partkey = ps_partkey
+	and p_brand <> 'Brand#34'
+	and p_type not like 'PROMO BRUSHED%'
+	and p_size in (27, 24, 6, 31, 43, 45, 36, 16)
+	and ps_suppkey not in (
+		select
+			s_suppkey
+		from
+			supplier
+		where
+			s_comment like '%Customer%Complaints%'
+	)
+group by
+	p_brand,
+	p_type,
+	p_size
+order by
+	supplier_cnt desc,
+	p_brand,
+	p_type,
+	p_size;
+                                                         QUERY PLAN                                                          
+-----------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=1249070.13..1249139.64 rows=27805 width=40)
+   Sort Key: (count(DISTINCT partsupp.ps_suppkey)), part.p_brand, part.p_type, part.p_size
+   ->  GroupAggregate  (cost=1224496.46..1247017.70 rows=27805 width=40)
+         Group Key: part.p_brand, part.p_type, part.p_size
+         ->  Sort  (cost=1224496.46..1228945.10 rows=1779455 width=40)
+               Sort Key: part.p_brand, part.p_type, part.p_size
+               ->  Hash Join  (cost=164100.19..1039762.30 rows=1779455 width=40)
+                     Hash Cond: (partsupp.ps_partkey = part.p_partkey)
+                     ->  Seq Scan on partsupp  (cost=8.76..812876.51 rows=11999950 width=8)
+                           Filter: (NOT (hashed SubPlan 1))
+                           SubPlan 1
+                             ->  Index Scan using supplier_s_suppkey_idx_like on supplier  (cost=0.14..8.69 rows=30 width=4)
+                     ->  Hash  (cost=152969.79..152969.79 rows=889731 width=40)
+                           ->  Bitmap Heap Scan on part  (cost=7433.29..152969.79 rows=889731 width=40)
+                                 Recheck Cond: (p_size = ANY ('{27,24,6,31,43,45,36,16}'::integer[]))
+                                 Filter: ((p_brand <> 'Brand#34'::bpchar) AND ((p_type)::text !~~ 'PROMO BRUSHED%'::text))
+                                 ->  Bitmap Index Scan on part_p_size_brin_idx  (cost=0.00..7210.86 rows=958780 width=0)
+                                       Index Cond: (p_size = ANY ('{27,24,6,31,43,45,36,16}'::integer[]))
+ Planning time: 3.310 ms
+(19 rows)
+
+COMMIT;
+COMMIT
